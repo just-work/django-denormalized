@@ -45,12 +45,12 @@ class CountTestCase(TestCase):
         self.member.save()
 
         self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 1)
+        self.assertEqual(self.group.members_count, 0)
 
     def test_refresh(self):
         """ Count cat be refreshed from db."""
         self.group.members_count = None
 
-        self.group.member_set.denormalize()
+        self.group.member_set._build_denormalize_method()
 
         self.assertEqual(self.group.members_count, 1)
