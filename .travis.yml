@@ -1,4 +1,6 @@
 language: python
+sudo: required
+dist: xenial
 python:
   - "3.6"
   - "3.7"
@@ -6,12 +8,6 @@ python:
 env:
   - DJANGO=2.0
   - DJANGO=2.1
-
-matrix:
-  include:
-    - python: "3.7"
-      dist: xenial
-      sudo: true
 
 # command to install dependencies
 install:
