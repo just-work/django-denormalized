@@ -84,10 +84,14 @@ class DenormalizedForeignKey(models.ForeignKey):
                 changed[foreign_object].add(tracker.field)
         for foreign_object, changed_fields in changed.items():
             updates = {f: getattr(foreign_object, f) for f in changed_fields}
-            u = type(foreign_object).objects.filter(pk=foreign_object.pk).update(
-                **updates)
-            # foreign_object.save(update_fields=changed_fields)
-            foreign_object.refresh_from_db()
+            self._update_object(foreign_object, **updates)
+
+    @staticmethod
+    def _update_object(obj, **updates):
+        updated = type(obj).objects.filter(pk=obj.pk).update(**updates)
+        if updated:
+            obj.refresh_from_db()
+
 
 
 
