@@ -140,3 +140,9 @@ class CountTestCase(TestCase):
 
         self.group.refresh_from_db()
         self.assertEqual(self.group.members_count, 1)
+
+    def test_collector_delete(self):
+        """ Cascade delete works correctly."""
+        self.group.delete()
+
+        self.assertEqual(models.Group.objects.count(), 0)
