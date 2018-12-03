@@ -133,3 +133,10 @@ class CountTestCase(TestCase):
 
         self.group.refresh_from_db()
         self.assertEqual(self.group.members_count, 1)
+
+    def test_handle_nullable_foreign_key(self):
+        """ Nullable foreign key is skipped for trackers."""
+        models.Member.objects.create(group=None)
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 1)

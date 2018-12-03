@@ -15,7 +15,7 @@ class Group(models.Model):
 
 class Member(models.Model):
     group = DenormalizedForeignKey(
-        Group, models.CASCADE,
+        Group, models.CASCADE, null=True,
         trackers=[DenormalizedTracker("members_count",
                                       callback=lambda obj: obj.active,
                                       query=Q(active=True)),

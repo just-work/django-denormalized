@@ -39,7 +39,7 @@ class DenormalizedTracker:
     def _update_value(self, foreign_object, instance, sign=1
                       ) -> Optional[models.Model]:
         delta = self._get_delta(instance) * sign
-        if delta == 0:
+        if delta == 0 or not foreign_object:
             return None
         setattr(foreign_object, self.field, F(self.field) + delta)
         return foreign_object
