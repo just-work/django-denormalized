@@ -7,6 +7,12 @@ env:
   - DJANGO=2.0
   - DJANGO=2.1
 
+matrix:
+  include:
+    - python: "3.7"
+      dist: xenial
+      sudo: true
+
 # command to install dependencies
 install:
   - pip install Django==$DJANGO
