@@ -5,7 +5,7 @@ with open('README.md') as f:
 
 setup(
     name='django_denormalized',
-    version='0.4.0',
+    version='0.5.0',
     packages=['denormalized'],
     url='https://github.com/just-work/django-denormalized',
     long_description=long_description,

@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Iterable
+from typing import Optional, Iterable
 
 from django.db import models
 from django.db.models import Count, Q, Sum, F
@@ -17,13 +17,16 @@ class DenormalizedTracker:
 
     def track_changes(self, instance=None, created=None, deleted=None
                       ) -> Iterable[models.Model]:
-        foreign_object = getattr(instance, self.foreign_key)
+        changed = []
+        try:
+            foreign_object = getattr(instance, self.foreign_key)
+        except models.ObjectDoesNotExist:
+            return changed
         is_suitable = self.callback(instance)
         if created and is_suitable:
             return self._update_value(foreign_object, instance, sign=1),
         elif deleted and is_suitable:
             return self._update_value(foreign_object, instance, sign=-1),
-        changed = []
         # handling instance update
         if is_suitable:
             changed.append(self._update_value(foreign_object, instance, sign=1))
