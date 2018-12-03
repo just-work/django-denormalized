@@ -106,3 +106,14 @@ class CountTestCase(TestCase):
 
         self.group.refresh_from_db()
         self.assertEqual(self.group.members_count, 2)
+
+    def test_no_dirty_increments(self):
+        """
+        Increment respects operations performed in db by another processes.
+        """
+        group = models.Group.objects.get(pk=self.group.pk)
+        models.Member.objects.create(group=group)
+
+        models.Member.objects.create(group=self.group)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 3)

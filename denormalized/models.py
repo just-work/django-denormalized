@@ -83,7 +83,11 @@ class DenormalizedForeignKey(models.ForeignKey):
             for foreign_object in filter(None, foreign_objects):
                 changed[foreign_object].add(tracker.field)
         for foreign_object, changed_fields in changed.items():
-            foreign_object.save(update_fields=changed_fields)
+            updates = {f: getattr(foreign_object, f) for f in changed_fields}
+            u = type(foreign_object).objects.filter(pk=foreign_object.pk).update(
+                **updates)
+            # foreign_object.save(update_fields=changed_fields)
+            foreign_object.refresh_from_db()
 
 
 

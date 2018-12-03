@@ -1,8 +1,7 @@
 from typing import Tuple, Optional, Iterable
 
 from django.db import models
-from django.db.models import Count, Q, Sum
-
+from django.db.models import Count, Q, Sum, F
 
 PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
 
@@ -42,8 +41,7 @@ class DenormalizedTracker:
         delta = self._get_delta(instance) * sign
         if delta == 0:
             return None
-        prev = getattr(foreign_object, self.field)
-        setattr(foreign_object, self.field, prev + delta)
+        setattr(foreign_object, self.field, F(self.field) + delta)
         return foreign_object
 
     def _get_delta(self, instance):
