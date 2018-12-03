@@ -1,6 +1,8 @@
 # django-denormalized
 Utils for maintaining denormalized aggregates for Django models.
 
+[![Build Status](https://travis-ci.org/tumb1er/django-denormalized.svg?branch=master)](https://travis-ci.org/tumb1er/django-denormalized)
+
 # Example
 
 ```python
