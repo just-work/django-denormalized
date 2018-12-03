@@ -47,10 +47,62 @@ class CountTestCase(TestCase):
         self.group.refresh_from_db()
         self.assertEqual(self.group.members_count, 0)
 
-    def test_refresh(self):
-        """ Count cat be refreshed from db."""
+    def test_denormalize(self):
+        """ Count can be refreshed from db."""
         self.group.members_count = None
 
-        self.group.member_set._build_denormalize_method()
+        self.group.member_set.denormalize()
 
         self.assertEqual(self.group.members_count, 1)
+
+    def test_denormalize_with_conditions(self):
+        """ Count can be refreshed from db."""
+        models.Member.objects.create(group=self.group, active=False)
+        self.group.members_count = None
+
+        self.group.member_set.denormalize()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 1)
+
+    def test_increment_sum_aggregate(self):
+        """ Sum is incremented properly."""
+        self.member.points = 10
+
+        self.member.save()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.points_sum, 10)
+
+    def test_decrement_sum_aggregate(self):
+        """ Sum is decremented properly."""
+        models.Member.objects.all().update(points=10)
+        models.Group.objects.all().update(points_sum=10)
+        self.member.refresh_from_db()
+
+        self.member.delete()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.points_sum, 0)
+
+    def test_decrement_on_became_not_suitable(self):
+        """ If object is not suitable anymore, decrement."""
+        self.member.active = False
+
+        self.member.save()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 0)
+
+    def test_increment_on_become_suitable(self):
+        """ If object became suitable, increment."""
+        member = models.Member.objects.create(active=False, group=self.group)
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 1)
+
+        member.active = True
+        member.save()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 2)

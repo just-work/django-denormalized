@@ -24,7 +24,8 @@ class DenormalizedReverseManyToOneDescriptor(
             foreign_object = related_manager.instance
             changed = set()
             for tracker in self.field.trackers:
-                value = related_manager.aggregate(a=tracker.aggregate)['a']
+                value = related_manager.filter(tracker.query).aggregate(
+                    a=tracker.aggregate)['a']
                 setattr(foreign_object, tracker.field, value)
                 changed.add(tracker.field)
             foreign_object.save(update_fields=changed)

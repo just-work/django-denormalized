@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Sum, Q
 
 from denormalized.models import DenormalizedForeignKey
 from denormalized.tracker import DenormalizedTracker
@@ -17,7 +17,8 @@ class Member(models.Model):
     group = DenormalizedForeignKey(
         Group, models.CASCADE,
         trackers=[DenormalizedTracker("members_count",
-                                      callback=lambda obj: obj.active),
+                                      callback=lambda obj: obj.active,
+                                      query=Q(active=True)),
                   DenormalizedTracker("points_sum", aggregate=Sum("points"))])
     active = models.BooleanField(default=True)
     points = models.IntegerField(default=0)
