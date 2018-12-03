@@ -13,7 +13,7 @@ class DenormalizedForeignKey(models.ForeignKey):
     def __init__(self, to, on_delete, related_name=None,
                  related_query_name=None, limit_choices_to=None,
                  parent_link=False, to_field=None, db_constraint=True,
-                 trackers: Iterable[DenormalizedTracker]=(), **kwargs):
+                 trackers: Iterable[DenormalizedTracker] = (), **kwargs):
         self.trackers = trackers
         super().__init__(to, on_delete, related_name=related_name,
                          related_query_name=related_query_name,
@@ -29,6 +29,8 @@ class DenormalizedForeignKey(models.ForeignKey):
                           dispatch_uid='denormalized_update_value_on_save')
         post_delete.connect(self._track_changes, sender=cls,
                             dispatch_uid='denormalized_update_value_on_delete')
+        for tracker in self.trackers:
+            tracker.foreign_key = self.name
 
     # noinspection PyUnusedLocal
     @staticmethod

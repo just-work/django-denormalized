@@ -5,7 +5,7 @@ PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
 
 
 class DenormalizedTracker:
-    def __init__(self, field, aggregate=Count, query=Q(),
+    def __init__(self, field, aggregate=Count('*'), query=Q(),
                  callback=lambda obj: True, related_name=None):
         self.field = field
         self.aggregate = aggregate
@@ -40,11 +40,9 @@ class DenormalizedTracker:
         return True
 
     def _get_delta(self, instance):
-        if self.aggregate is Count:
+        if isinstance(self.aggregate, Count):
             return 1
-        elif self.aggregate is Sum:
+        elif isinstance(self.aggregate, Sum):
             arg = self.aggregate.source_expressions[0]
-            return getattr(instance, arg)
+            return getattr(instance, arg.name)
         raise NotImplementedError()
-
-
