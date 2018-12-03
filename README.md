@@ -2,7 +2,7 @@
 Utils for maintaining denormalized aggregates for Django models.
 
 [![Build Status](https://travis-ci.org/just-work/django-denormalized.svg?branch=master)](https://travis-ci.org/just-work/django-denormalized)
-
+[![codecov.io](http://codecov.io/github/just-work/django-denormalized.svg?branch=master)](http://codecov.io/github/just-work/django-denormalized?branch=master)
 # Example
 
 ```python
