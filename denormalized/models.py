@@ -53,6 +53,8 @@ class DenormalizedForeignKey(models.ForeignKey):
                           dispatch_uid='denormalized_track_previous')
         post_save.connect(self._track_changes, sender=cls,
                           dispatch_uid='denormalized_update_value_on_save')
+        post_save.connect(self._track_previous_version, sender=cls,
+                          dispatch_uid='update_denormalized_previous')
         post_delete.connect(self._track_changes, sender=cls,
                             dispatch_uid='denormalized_update_value_on_delete')
         for tracker in self.trackers:

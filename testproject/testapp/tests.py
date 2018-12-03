@@ -117,3 +117,19 @@ class CountTestCase(TestCase):
         models.Member.objects.create(group=self.group)
         self.group.refresh_from_db()
         self.assertEqual(self.group.members_count, 3)
+
+    def test_previous_state_reset_on_save(self):
+        """ Save resets saved previous state for tracked object."""
+        member = models.Member.objects.create(group=self.group, active=False)
+
+        member.active = True
+        member.save()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 2)
+
+        member.active = False
+        member.save()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.members_count, 1)
