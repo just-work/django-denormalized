@@ -7,7 +7,7 @@ setup(
     name='django_denormalized',
     version='0.4.0',
     packages=['denormalized'],
-    url='https://github.com/tumb1er/django-denormalized',
+    url='https://github.com/just-work/django-denormalized',
     long_description=long_description,
     long_description_content_type='text/markdown',
     license='Beer License',
