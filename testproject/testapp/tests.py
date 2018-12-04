@@ -158,6 +158,8 @@ class CountTestCase(TestCase):
 
     def test_collector_delete(self):
         """ Cascade delete works correctly."""
+        models.Member.objects.create(active=False, group=self.group)
+
         self.group.delete()
 
         self.assertEqual(models.Group.objects.count(), 0)
