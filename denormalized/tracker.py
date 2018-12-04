@@ -21,6 +21,7 @@ class DenormalizedTracker:
         try:
             foreign_object = getattr(instance, self.foreign_key)
         except models.ObjectDoesNotExist:
+            # this may raise DNE while cascade deleting with Collector
             foreign_object = None
         is_suitable = self.callback(instance)
         delta = self._get_delta(instance)
@@ -31,10 +32,7 @@ class DenormalizedTracker:
         old_instance = getattr(instance, PREVIOUS_VERSION_FIELD)
         old_delta = self._get_delta(old_instance)
         old_suitable = self.callback(old_instance)
-        try:
-            old_foreign_object = getattr(old_instance, self.foreign_key)
-        except models.ObjectDoesNotExist:
-            old_foreign_object = None
+        old_foreign_object = getattr(old_instance, self.foreign_key)
 
         sign = is_suitable - old_suitable
         if foreign_object == old_foreign_object and sign != 0:
