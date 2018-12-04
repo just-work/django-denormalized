@@ -93,8 +93,3 @@ class DenormalizedForeignKey(models.ForeignKey):
         updated = type(obj).objects.filter(pk=obj.pk).update(**updates)
         if updated:
             obj.refresh_from_db()
-
-
-
-
-

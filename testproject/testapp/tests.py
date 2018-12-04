@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from django.test import TestCase
 
 from testproject.testapp import models
@@ -8,24 +9,33 @@ class CountTestCase(TestCase):
         self.group = models.Group.objects.create()
         self.member = models.Member.objects.create(group=self.group)
 
+    def assertMembersCount(self, group: models.Group = None):
+        group = group or self.group
+        group.refresh_from_db()
+        expected = group.member_set.filter(active=True).count()
+        self.assertEqual(group.members_count, expected)
+
+    def assertPointsSum(self, group: models.Group = None):
+        group = group or self.group
+        group.refresh_from_db()
+        expected = group.member_set.aggregate(s=Sum('points'))['s'] or 0
+        self.assertEqual(group.points_sum, expected)
+
     def test_initial_value(self):
         """ After setUp group has single member."""
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 1)
+        self.assertMembersCount()
 
     def test_increment_on_new(self):
         """ Creating new member increments counter."""
         models.Member.objects.create(group=self.group)
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 2)
+        self.assertMembersCount()
 
     def test_decrement_on_delete(self):
         """ Deleting member decrements counter."""
         self.member.delete()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 0)
+        self.assertMembersCount()
 
     def test_increment_on_change(self):
         """ Changing foreign key increments counter."""
@@ -34,8 +44,7 @@ class CountTestCase(TestCase):
 
         self.member.save()
 
-        group.refresh_from_db()
-        self.assertEqual(group.members_count, 1)
+        self.assertMembersCount()
 
     def test_decrement_on_change(self):
         """ Changing foreign key decrements counter for old value."""
@@ -44,8 +53,7 @@ class CountTestCase(TestCase):
 
         self.member.save()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 0)
+        self.assertMembersCount()
 
     def test_denormalize(self):
         """ Count can be refreshed from db."""
@@ -53,7 +61,7 @@ class CountTestCase(TestCase):
 
         self.group.member_set.denormalize()
 
-        self.assertEqual(self.group.members_count, 1)
+        self.assertMembersCount()
 
     def test_denormalize_with_conditions(self):
         """ Count can be refreshed from db."""
@@ -62,8 +70,7 @@ class CountTestCase(TestCase):
 
         self.group.member_set.denormalize()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 1)
+        self.assertMembersCount()
 
     def test_increment_sum_aggregate(self):
         """ Sum is incremented properly."""
@@ -71,8 +78,7 @@ class CountTestCase(TestCase):
 
         self.member.save()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.points_sum, 10)
+        self.assertPointsSum()
 
     def test_decrement_sum_aggregate(self):
         """ Sum is decremented properly."""
@@ -82,8 +88,7 @@ class CountTestCase(TestCase):
 
         self.member.delete()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.points_sum, 0)
+        self.assertPointsSum()
 
     def test_decrement_on_became_not_suitable(self):
         """ If object is not suitable anymore, decrement."""
@@ -91,21 +96,18 @@ class CountTestCase(TestCase):
 
         self.member.save()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 0)
+        self.assertMembersCount()
 
     def test_increment_on_become_suitable(self):
         """ If object became suitable, increment."""
         member = models.Member.objects.create(active=False, group=self.group)
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 1)
+        self.assertMembersCount()
 
         member.active = True
         member.save()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 2)
+        self.assertMembersCount()
 
     def test_no_dirty_increments(self):
         """
@@ -115,8 +117,8 @@ class CountTestCase(TestCase):
         models.Member.objects.create(group=group)
 
         models.Member.objects.create(group=self.group)
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 3)
+
+        self.assertMembersCount()
 
     def test_previous_state_reset_on_save(self):
         """ Save resets saved previous state for tracked object."""
@@ -125,24 +127,45 @@ class CountTestCase(TestCase):
         member.active = True
         member.save()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 2)
+        self.assertMembersCount()
 
         member.active = False
         member.save()
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 1)
+        self.assertMembersCount()
 
     def test_handle_nullable_foreign_key(self):
         """ Nullable foreign key is skipped for trackers."""
         models.Member.objects.create(group=None)
 
-        self.group.refresh_from_db()
-        self.assertEqual(self.group.members_count, 1)
+        self.assertMembersCount()
+
+    def test_foreign_key_become_null(self):
+        """ If foreign key became null, decrement."""
+        self.member.group = None
+        self.member.save()
+
+        self.assertMembersCount()
+
+    def test_foreign_key_become_not_null(self):
+        """ If foreign key became not null, increment."""
+        member = models.Member.objects.create(group=None)
+
+        member.group = self.group
+        member.save()
+
+        self.assertMembersCount()
 
     def test_collector_delete(self):
         """ Cascade delete works correctly."""
         self.group.delete()
 
         self.assertEqual(models.Group.objects.count(), 0)
+
+    def test_save_not_affects_counters(self):
+        """
+        Saving fields not related to denormalized values not affects counts.
+        """
+        self.member.save()
+
+        self.assertMembersCount()
