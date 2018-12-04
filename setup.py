@@ -19,7 +19,8 @@ def get_version():
     https://gist.github.com/pwithnall/7bc5f320b3bdf418265a
     """
     d: Path = Path(__file__).parent.absolute()
-    if d.parents[0].joinpath('.git').is_dir():
+    git_dir = d.joinpath('.git')
+    if git_dir.is_dir():
         # Get the version using "git describe".
         cmd = 'git describe --tags --match [0-9]*'.split()
         try:
