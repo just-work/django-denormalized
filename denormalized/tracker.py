@@ -21,30 +21,38 @@ class DenormalizedTracker:
         try:
             foreign_object = getattr(instance, self.foreign_key)
         except models.ObjectDoesNotExist:
-            return changed
+            # this may raise DNE while cascade deleting with Collector
+            foreign_object = None
         is_suitable = self.callback(instance)
+        delta = self._get_delta(instance)
         if created and is_suitable:
-            return self._update_value(foreign_object, instance, sign=1),
+            return self._update_value(foreign_object, delta, sign=1),
         elif deleted and is_suitable:
-            return self._update_value(foreign_object, instance, sign=-1),
-        # handling instance update
-        if is_suitable:
-            changed.append(self._update_value(foreign_object, instance, sign=1))
-        # rolling back previous version
+            return self._update_value(foreign_object, delta, sign=-1),
         old_instance = getattr(instance, PREVIOUS_VERSION_FIELD)
-        is_suitable = self.callback(old_instance)
-        if is_suitable:
-            old_foreign_object = getattr(old_instance, self.foreign_key)
-            changed.append(self._update_value(old_foreign_object, old_instance,
-                                              sign=-1))
-        return changed
+        old_delta = self._get_delta(old_instance)
+        old_suitable = self.callback(old_instance)
+        old_foreign_object = getattr(old_instance, self.foreign_key)
 
-    def _update_value(self, foreign_object, instance, sign=1
+        sign = is_suitable - old_suitable
+        if foreign_object == old_foreign_object and sign != 0:
+            changed.append(self._update_value(foreign_object, delta, sign=sign))
+        elif foreign_object != old_foreign_object:
+            changed.append(self._update_value(
+                old_foreign_object, old_delta, sign=-1))
+            changed.append(self._update_value(foreign_object, delta, sign=1))
+        else:
+            # foreign_object == old_foreign_object and sign == 0
+            changed.append(self._update_value(
+                foreign_object, delta - old_delta, sign=1))
+
+        return filter(None, changed)
+
+    def _update_value(self, foreign_object, delta, sign=1
                       ) -> Optional[models.Model]:
-        delta = self._get_delta(instance) * sign
         if delta == 0 or not foreign_object:
             return None
-        setattr(foreign_object, self.field, F(self.field) + delta)
+        setattr(foreign_object, self.field, F(self.field) + delta * sign)
         return foreign_object
 
     def _get_delta(self, instance):
