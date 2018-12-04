@@ -32,7 +32,10 @@ class DenormalizedTracker:
         old_instance = getattr(instance, PREVIOUS_VERSION_FIELD)
         old_delta = self._get_delta(old_instance)
         old_suitable = self.callback(old_instance)
-        old_foreign_object = getattr(old_instance, self.foreign_key)
+        try:
+            old_foreign_object = getattr(old_instance, self.foreign_key)
+        except models.ObjectDoesNotExist:
+            old_foreign_object = None
 
         sign = is_suitable - old_suitable
         if foreign_object == old_foreign_object and sign != 0:
@@ -61,4 +64,4 @@ class DenormalizedTracker:
         elif isinstance(self.aggregate, Sum):
             arg = self.aggregate.source_expressions[0]
             return getattr(instance, arg.name)
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
