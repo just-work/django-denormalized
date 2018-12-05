@@ -47,6 +47,26 @@ class DenormalizedForeignKey(models.ForeignKey):
                          parent_link=parent_link, to_field=to_field,
                          db_constraint=db_constraint, **kwargs)
 
+    @staticmethod
+    def store_initial_state(instance):
+        """ Save initial version of tracked instance in it's __dict__."""
+        model = type(instance)
+        prev = model()
+        old = instance.__dict__.copy()
+        del old['_state']
+        prev.__dict__.update(old)
+        setattr(instance, PREVIOUS_VERSION_FIELD, prev)
+
+    @staticmethod
+    def update_object(obj, **updates):
+        """ Update denormalized fields incrementally with F-objects.
+
+        After update receives actual object version from db.
+        """
+        updated = type(obj).objects.filter(pk=obj.pk).update(**updates)
+        if updated:
+            obj.refresh_from_db()
+
     def contribute_to_class(self, cls, name, private_only=False, **kwargs):
         super().contribute_to_class(cls, name, private_only, **kwargs)
         post_init.connect(self._track_previous_version, sender=cls,
@@ -66,11 +86,7 @@ class DenormalizedForeignKey(models.ForeignKey):
             return
         self.__in_init = True
         try:
-            prev = sender()
-            old = instance.__dict__.copy()
-            del old['_state']
-            prev.__dict__.update(old)
-            setattr(instance, PREVIOUS_VERSION_FIELD, prev)
+            self.store_initial_state(instance)
         finally:
             self.__in_init = False
 
@@ -86,10 +102,4 @@ class DenormalizedForeignKey(models.ForeignKey):
                 changed[foreign_object].add(tracker.field)
         for foreign_object, changed_fields in changed.items():
             updates = {f: getattr(foreign_object, f) for f in changed_fields}
-            self._update_object(foreign_object, **updates)
-
-    @staticmethod
-    def _update_object(obj, **updates):
-        updated = type(obj).objects.filter(pk=obj.pk).update(**updates)
-        if updated:
-            obj.refresh_from_db()
+            self.update_object(foreign_object, **updates)
