@@ -1,3 +1,5 @@
+""" Django ORM fields and descriptors."""
+
 from collections import defaultdict
 from typing import Iterable, Dict
 
@@ -6,8 +8,8 @@ from django.db.models.fields import related_descriptors
 from django.db.models.signals import post_save, post_delete, post_init
 from django.utils.functional import cached_property
 
-from denormalized.tracker import PREVIOUS_VERSION_FIELD, DenormalizedTracker, \
-    IncrementalUpdates
+from denormalized.tracker import PREVIOUS_VERSION_FIELD, DenormalizedTracker
+from denormalized.types import IncrementalUpdates
 
 
 class DenormalizedReverseManyToOneDescriptor(

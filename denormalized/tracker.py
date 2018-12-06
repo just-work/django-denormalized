@@ -1,14 +1,14 @@
-from typing import Optional, Iterable, Dict, Tuple
+""" Tracking changes for denormalized fields."""
+
+from typing import Optional, Iterable, Tuple
 
 from django.db import models
 from django.db.models import Count, Q, Sum, F
 from django.db.models.expressions import CombinedExpression
 
+from denormalized.types import IncrementalUpdates
+
 PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
-
-
-# Type for incremental updates with field names as keys and F-objects values.
-IncrementalUpdates = Dict[str, CombinedExpression]
 
 
 class DenormalizedTracker:
