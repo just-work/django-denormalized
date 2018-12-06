@@ -1,12 +1,13 @@
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, Dict
 
 from django.db import models
 from django.db.models.fields import related_descriptors
 from django.db.models.signals import post_save, post_delete, post_init
 from django.utils.functional import cached_property
 
-from denormalized.tracker import PREVIOUS_VERSION_FIELD, DenormalizedTracker
+from denormalized.tracker import PREVIOUS_VERSION_FIELD, DenormalizedTracker, \
+    IncrementalUpdates
 
 
 class DenormalizedReverseManyToOneDescriptor(
@@ -63,9 +64,9 @@ class DenormalizedForeignKey(models.ForeignKey):
 
         After update receives actual object version from db.
         """
-        updated = type(obj).objects.filter(pk=obj.pk).update(**updates)
-        if updated:
-            obj.refresh_from_db()
+        obj.__dict__.update(updates)
+        obj.save(update_fields=set(updates))
+        obj.refresh_from_db()
 
     def contribute_to_class(self, cls, name, private_only=False, **kwargs):
         super().contribute_to_class(cls, name, private_only, **kwargs)
@@ -95,11 +96,14 @@ class DenormalizedForeignKey(models.ForeignKey):
                        created=None, **kwargs):
         deleted = signal is post_delete
 
-        changed = defaultdict(set)
+        changed: Dict[models.Model, IncrementalUpdates] = defaultdict(dict)
+
         for tracker in self.trackers:
-            foreign_objects = tracker.track_changes(instance, created, deleted)
-            for foreign_object in filter(None, foreign_objects):
-                changed[foreign_object].add(tracker.field)
-        for foreign_object, changed_fields in changed.items():
-            updates = {f: getattr(foreign_object, f) for f in changed_fields}
+            # collecting changes from all trackers to denormalized objects
+            changes = tracker.track_changes(instance, created, deleted)
+            for foreign_object, updates in filter(None, changes):
+                changed[foreign_object].update(updates)
+
+        for foreign_object, updates in changed.items():
+            # applying changes to denormalized objects
             self.update_object(foreign_object, **updates)

@@ -1,9 +1,14 @@
-from typing import Optional, Iterable
+from typing import Optional, Iterable, Dict, Tuple
 
 from django.db import models
 from django.db.models import Count, Q, Sum, F
+from django.db.models.expressions import CombinedExpression
 
 PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
+
+
+# Type for incremental updates with field names as keys and F-objects values.
+IncrementalUpdates = Dict[str, CombinedExpression]
 
 
 class DenormalizedTracker:
@@ -16,7 +21,7 @@ class DenormalizedTracker:
         self.foreign_key = related_name
 
     def track_changes(self, instance=None, created=None, deleted=None
-                      ) -> Iterable[models.Model]:
+                      ) -> Iterable[Tuple[models.Model, IncrementalUpdates]]:
         changed = []
         try:
             foreign_object = getattr(instance, self.foreign_key)
@@ -52,16 +57,19 @@ class DenormalizedTracker:
         return filter(None, changed)
 
     def _update_value(self, foreign_object, delta, sign=1
-                      ) -> Optional[models.Model]:
+                      ) -> Optional[Tuple[models.Model, IncrementalUpdates]]:
         if delta == 0 or not foreign_object:
             return None
-        setattr(foreign_object, self.field, F(self.field) + delta * sign)
-        return foreign_object
+        return foreign_object, {self.field: F(self.field) + delta * sign}
 
     def _get_delta(self, instance):
         if isinstance(self.aggregate, Count):
             return 1
         elif isinstance(self.aggregate, Sum):
             arg = self.aggregate.source_expressions[0]
-            return getattr(instance, arg.name)
+            value = getattr(instance, arg.name)
+            if isinstance(value, CombinedExpression):
+                instance.refresh_from_db(fields=(arg.name,))
+                value = getattr(instance, arg.name)
+            return value
         raise NotImplementedError()  # pragma: no cover
