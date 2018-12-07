@@ -8,6 +8,8 @@ from denormalized.tracker import DenormalizedTracker
 class Group(models.Model):
     members_count = models.PositiveIntegerField(default=0)
     points_sum = models.PositiveIntegerField(default=0)
+    points_min = models.PositiveIntegerField(null=True)
+    points_max = models.PositiveIntegerField(null=True)
 
     class Meta:
         app_label = 'testapp'

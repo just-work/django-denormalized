@@ -1,6 +1,6 @@
 from typing import Union
 
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Min
 from django.test import TestCase
 
 from testproject.testapp import models
@@ -22,6 +22,12 @@ class CountTestCase(TestCase):
         obj.refresh_from_db()
         expected = obj.member_set.aggregate(s=Sum('points'))['s'] or 0
         self.assertEqual(obj.points_sum, expected)
+
+    def assertMinValue(self, group: models.Group = None):
+        group = group or self.group
+        group.refresh_from_db()
+        expected = group.member_set.aggregate(m=Min('points'))['m']
+        self.assertEqual(group.points_min, expected)
 
     def test_initial_value(self):
         """ After setUp group has single member."""
@@ -255,3 +261,32 @@ class CountTestCase(TestCase):
 
         self.assertPointsSum(team)
         self.assertPointsSum(self.group)
+
+    def test_track_min_value_on_add_first(self):
+        """
+        Tracking min value is correct when adding first object to group.
+        """
+        group = models.Group.objects.create()
+
+        models.Member.objects.create(group=group, points=5)
+
+        self.assertMinValue(group)
+
+    def test_track_min_value_preserved_on_new_member(self):
+        """
+        Min value is same after adding new object with greater value.
+        """
+
+        models.Member.objects.create(group=self.group, points=5)
+
+        self.assertMinValue()
+
+    def test_track_min_value_changed_on_change(self):
+        """
+        If object with min value changed this value, aggregate is updated
+        """
+
+        self.member.points = 10
+        self.member.save()
+
+        self.assertMinValue()
