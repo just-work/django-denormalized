@@ -36,3 +36,12 @@ class Member(models.Model):
 
     class Meta:
         app_label = 'testapp'
+
+    def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
+        """
+        Override base save to test whether overridden save is also wrapped
+        in DenormalizedForeignKey._wrap_save.
+        """
+        super().save(force_insert, force_update, using, update_fields)
+
