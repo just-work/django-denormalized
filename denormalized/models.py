@@ -5,7 +5,7 @@ from typing import Iterable, Dict
 
 from django.db import models
 from django.db.models.fields import related_descriptors
-from django.db.models.signals import post_save, post_delete, post_init
+from django.db.models.signals import post_save, post_delete, post_init, class_prepared
 from django.utils.functional import cached_property
 
 from denormalized.tracker import PREVIOUS_VERSION_FIELD, DenormalizedTracker
@@ -82,21 +82,29 @@ class DenormalizedForeignKey(models.ForeignKey):
         post_delete.connect(
             self._track_changes, sender=cls,
             dispatch_uid=f'denormalized_update_value_on_delete:{suffix}')
-        if not hasattr(cls.save, 'denormalized_wrapper'):
-            cls.save = self._wrap_save(cls.save)
+        class_prepared.connect(
+            self._wrap_save, sender=cls,
+            dispatch_uid=f'denormalized_wrap_save:{suffix}')
         for tracker in self.trackers:
             tracker.foreign_key = self.name
 
-    def _wrap_save(self, save):
-        """ Reset cached initial state after save call completed."""
+    # noinspection PyUnusedLocal
+    def _wrap_save(self, sender, **kwargs):
+        """ Wraps model save with state post-invalidation."""
+
+        if hasattr(sender.save, 'denormalized_wrapper'):
+            return
+        save = sender.save
+
         @functools.wraps(save)
-        def wrapped(instance, *args, **kwargs):
-            save(instance, *args, **kwargs)
+        def wrapped(instance, *args, **kw):
+            """ Reset cached initial state after save call completed."""
+            save(instance, *args, **kw)
             self.store_initial_state(instance)
 
         wrapped.denormalized_wrapper = True
 
-        return wrapped
+        sender.save = wrapped
 
     # noinspection PyUnusedLocal
     def _track_previous_version(self, sender=None, instance=None, **kwargs):
