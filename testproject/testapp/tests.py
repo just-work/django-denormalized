@@ -33,9 +33,27 @@ class CountTestCase(TestCase):
 
         self.assertMembersCount()
 
+    def test_skip_increment_on_new(self):
+        """ Creating new non-suitable member leaves counter same."""
+        member = models.Member()
+        member.group = self.group
+        member.active = False
+
+        member.save()
+
+        self.assertMembersCount()
+
     def test_decrement_on_delete(self):
         """ Deleting member decrements counter."""
         self.member.delete()
+
+        self.assertMembersCount()
+
+    def test_skip_decrement_on_delete(self):
+        """ Deleting member decrements counter."""
+        member = models.Member.objects.create(group=self.group, active=False)
+
+        member.delete()
 
         self.assertMembersCount()
 
@@ -54,6 +72,15 @@ class CountTestCase(TestCase):
         self.member.group = group
 
         self.member.save()
+
+        self.assertMembersCount()
+
+    def test_increment_on_set_group(self):
+        """ If object without group is moved to group, increment."""
+        member = models.Member.objects.create(group=None, active=True)
+        member.group = self.group
+
+        member.save()
 
         self.assertMembersCount()
 

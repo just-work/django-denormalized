@@ -30,10 +30,14 @@ class DenormalizedTracker:
             foreign_object = None
         is_suitable = self.callback(instance)
         delta = self._get_delta(instance)
-        if created and is_suitable:
-            return self._update_value(foreign_object, delta, sign=1),
-        elif deleted and is_suitable:
-            return self._update_value(foreign_object, delta, sign=-1),
+        if created:
+            if is_suitable:
+                return self._update_value(foreign_object, delta, sign=1),
+            return []
+        elif deleted:
+            if is_suitable:
+                return self._update_value(foreign_object, delta, sign=-1),
+            return []
         old_instance = getattr(instance, PREVIOUS_VERSION_FIELD)
         old_delta = self._get_delta(old_instance)
         old_suitable = self.callback(old_instance)
