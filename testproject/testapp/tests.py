@@ -1,4 +1,4 @@
-from django.db.models import Sum
+from django.db.models import Sum, F
 from django.test import TestCase
 
 from testproject.testapp import models
@@ -171,3 +171,16 @@ class CountTestCase(TestCase):
         self.member.save()
 
         self.assertMembersCount()
+
+    def test_save_incremental(self):
+        """
+        Using F-objects for tracked models
+        """
+        points = self.group.points_sum
+        self.member.points = F('points') + 1
+
+        self.member.save()
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.points_sum, points + 1)
+
