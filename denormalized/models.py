@@ -1,5 +1,5 @@
 """ Django ORM fields and descriptors."""
-
+import functools
 from collections import defaultdict
 from typing import Iterable, Dict
 
@@ -72,16 +72,31 @@ class DenormalizedForeignKey(models.ForeignKey):
 
     def contribute_to_class(self, cls, name, private_only=False, **kwargs):
         super().contribute_to_class(cls, name, private_only, **kwargs)
-        post_init.connect(self._track_previous_version, sender=cls,
-                          dispatch_uid='denormalized_track_previous')
-        post_save.connect(self._track_changes, sender=cls,
-                          dispatch_uid='denormalized_update_value_on_save')
-        post_save.connect(self._track_previous_version, sender=cls,
-                          dispatch_uid='update_denormalized_previous')
-        post_delete.connect(self._track_changes, sender=cls,
-                            dispatch_uid='denormalized_update_value_on_delete')
+        suffix = f':{cls.__name__}:{name}'
+        post_init.connect(
+            self._track_previous_version, sender=cls,
+            dispatch_uid=f'denormalized_track_previous:{suffix}')
+        post_save.connect(
+            self._track_changes, sender=cls,
+            dispatch_uid=f'denormalized_update_value_on_save:{suffix}')
+        post_delete.connect(
+            self._track_changes, sender=cls,
+            dispatch_uid=f'denormalized_update_value_on_delete:{suffix}')
+        if not hasattr(cls.save, 'denormalized_wrapper'):
+            cls.save = self._wrap_save(cls.save)
         for tracker in self.trackers:
             tracker.foreign_key = self.name
+
+    def _wrap_save(self, save):
+        """ Reset cached initial state after save call completed."""
+        @functools.wraps(save)
+        def wrapped(instance, *args, **kwargs):
+            save(instance, *args, **kwargs)
+            self.store_initial_state(instance)
+
+        wrapped.denormalized_wrapper = True
+
+        return wrapped
 
     # noinspection PyUnusedLocal
     def _track_previous_version(self, sender=None, instance=None, **kwargs):

@@ -1,3 +1,5 @@
+from typing import Union
+
 from django.db.models import Sum, F
 from django.test import TestCase
 
@@ -15,11 +17,11 @@ class CountTestCase(TestCase):
         expected = group.member_set.filter(active=True).count()
         self.assertEqual(group.members_count, expected)
 
-    def assertPointsSum(self, group: models.Group = None):
-        group = group or self.group
-        group.refresh_from_db()
-        expected = group.member_set.aggregate(s=Sum('points'))['s'] or 0
-        self.assertEqual(group.points_sum, expected)
+    def assertPointsSum(self, obj: Union[models.Group, models.Team] = None):
+        obj = obj or self.group
+        obj.refresh_from_db()
+        expected = obj.member_set.aggregate(s=Sum('points'))['s'] or 0
+        self.assertEqual(obj.points_sum, expected)
 
     def test_initial_value(self):
         """ After setUp group has single member."""
@@ -184,3 +186,17 @@ class CountTestCase(TestCase):
         self.group.refresh_from_db()
         self.assertEqual(self.group.points_sum, points + 1)
 
+    def test_track_multiple_foreign_keys(self):
+        """ Multiple foreign keys tracked correctly."""
+        team = models.Team.objects.create()
+        self.member.team = team
+        self.member.save()
+
+        self.assertPointsSum(team)
+        self.assertPointsSum(self.group)
+
+        self.member.points += 1
+        self.member.save()
+
+        self.assertPointsSum(team)
+        self.assertPointsSum(self.group)
