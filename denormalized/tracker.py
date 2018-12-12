@@ -47,9 +47,12 @@ class DenormalizedTracker:
         if foreign_object == old_foreign_object and sign != 0:
             changed.append(self._update_value(foreign_object, delta, sign=sign))
         elif foreign_object != old_foreign_object:
-            changed.append(self._update_value(
-                old_foreign_object, old_delta, sign=-1))
-            changed.append(self._update_value(foreign_object, delta, sign=1))
+            if old_suitable:
+                changed.append(self._update_value(
+                    old_foreign_object, old_delta, sign=-1))
+            if is_suitable:
+                changed.append(self._update_value(
+                    foreign_object, delta, sign=1))
         else:
             # foreign_object == old_foreign_object and sign == 0
             changed.append(self._update_value(

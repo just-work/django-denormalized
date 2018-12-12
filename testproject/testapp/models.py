@@ -44,4 +44,3 @@ class Member(models.Model):
         in DenormalizedForeignKey._wrap_save.
         """
         super().save(force_insert, force_update, using, update_fields)
-
