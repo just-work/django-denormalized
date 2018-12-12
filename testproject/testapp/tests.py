@@ -84,6 +84,34 @@ class CountTestCase(TestCase):
 
         self.assertMembersCount()
 
+    def test_increment_and_change_group(self):
+        """
+        If object changes group and becomes active, only new group increments.
+        """
+        group = models.Group.objects.create()
+        self.member.active = False
+        self.member.save()
+
+        self.member.active = True
+        self.member.group = group
+        self.member.save()
+
+        self.assertMembersCount()
+        self.assertMembersCount(group)
+
+    def test_decrement_and_change_group(self):
+        """
+        If object changes group and becomes inactive, only old group increments.
+        """
+        group = models.Group.objects.create()
+
+        self.member.active = False
+        self.member.group = group
+        self.member.save()
+
+        self.assertMembersCount()
+        self.assertMembersCount(group)
+
     def test_denormalize(self):
         """ Count can be refreshed from db."""
         self.group.members_count = None
