@@ -1,12 +1,11 @@
 """ Tracking changes for denormalized fields."""
-from copy import copy
 from typing import Optional, Iterable, Tuple
 
 from django.db import models
-from django.db.models import Count, Q, Sum, Min, F
+from django.db.models import Count, Q, F
 from django.db.models.expressions import CombinedExpression, Expression, \
-    OuterRef, ExpressionWrapper, Subquery
-from django.db.models.functions import Coalesce, Least
+    OuterRef, Subquery
+from django.db.models.functions import Coalesce, Least, Greatest
 
 from denormalized.types import IncrementalUpdates
 
@@ -113,40 +112,71 @@ class DenormalizedTracker:
         :param previous: initial version of tracked object
         :return: expression to update foreign object with.
         """
-        if isinstance(self.aggregate, Count):
-            if mode == CHANGING:
+        callback_name = f'_get_{self.aggregate.name.lower()}_delta'
+        try:
+            callback = getattr(self, callback_name)
+            return callback(instance, mode, previous)
+        except AttributeError:  # pragma: no cover
+            raise NotImplementedError()
+
+    # noinspection PyUnusedLocal
+    def _get_count_delta(self, instance, mode, previous):
+        """ Get incremental update for Count aggregate."""
+        if mode == CHANGING:
+            # updates not needed
+            return None
+        return F(self.field) + mode
+
+    def _get_sum_delta(self, instance, mode, previous):
+        """ Get incremental update for Sum aggregate."""
+        new_value = self._get_value_from_instance(instance)
+        if mode == CHANGING:
+            old_value = self._get_value_from_instance(previous)
+            if new_value - old_value == 0:
                 # updates not needed
                 return None
-            return F(self.field) + mode
-        elif isinstance(self.aggregate, Sum):
-            new_value = self.get_value_from_instance(instance)
-            if mode == CHANGING:
-                old_value = self.get_value_from_instance(previous)
-                if new_value - old_value == 0:
-                    # updates not needed
-                    return None
-                return F(self.field) + new_value - old_value
-            # mode is ENTERING or LEAVING, only new_value matters.
-            return F(self.field) + new_value * mode
-        elif isinstance(self.aggregate, Min):
-            new_value = self.get_value_from_instance(instance)
-            if mode == LEAVING:
-                # new denormalized value is somewhere in DB, computing full
-                # aggregate
-                return self.get_full_aggregate(instance)
-            if mode == ENTERING:
-                return Coalesce(Least(F(self.field), new_value), new_value)
-            if mode == CHANGING:
-                old_value = self.get_value_from_instance(previous)
-                if old_value > new_value:
-                    # value decreases, so denormalized value also may decrease
-                    return Coalesce(Least(F(self.field), new_value), new_value)
-            # (mode == CHANGING and value increases)
-            # in this situation we can't make anything except full recompute
-            return self.get_full_aggregate(instance)
-        raise NotImplementedError()  # pragma: no cover
+            return F(self.field) + new_value - old_value
+        # mode is ENTERING or LEAVING, only new_value matters.
+        return F(self.field) + new_value * mode
 
-    def get_value_from_instance(self, instance):
+    def _get_min_delta(self, instance, mode, previous):
+        """ Get incremental update for Min aggregate."""
+        new_value = self._get_value_from_instance(instance)
+        if mode == LEAVING:
+            # new denormalized value is somewhere in DB, computing full
+            # aggregate
+            return self._get_full_aggregate(instance)
+        if mode == ENTERING:
+            return Coalesce(Least(F(self.field), new_value), new_value)
+        if mode == CHANGING:
+            old_value = self._get_value_from_instance(previous)
+            if old_value > new_value:
+                # value decreases, so denormalized value also may decrease
+                return Coalesce(Least(F(self.field), new_value), new_value)
+        # (mode == CHANGING and value increases)
+        # in this situation we can't make anything except full recompute
+        return self._get_full_aggregate(instance)
+
+    def _get_max_delta(self, instance, mode, previous):
+        """ Get incremental update for Max aggregate."""
+        new_value = self._get_value_from_instance(instance)
+        if mode == LEAVING:
+            # new denormalized value is somewhere in DB, computing full
+            # aggregate
+            return self._get_full_aggregate(instance)
+        if mode == ENTERING:
+            return Coalesce(Greatest(F(self.field), new_value), new_value)
+        if mode == CHANGING:
+            old_value = self._get_value_from_instance(previous)
+            if old_value < new_value:
+                # value increases, so denormalized value also may increase
+                return Coalesce(Least(F(self.field), new_value), new_value)
+        # (mode == CHANGING and value decreases)
+        # in this situation we can't make anything except full recompute
+        return self._get_full_aggregate(instance)
+
+    def _get_value_from_instance(self, instance):
+        """ Get tracked value from instance."""
         arg = self.aggregate.source_expressions[0]
         value = getattr(instance, arg.name)
         if isinstance(value, CombinedExpression):
@@ -154,12 +184,12 @@ class DenormalizedTracker:
             value = getattr(instance, arg.name)
         return value
 
-    def get_full_aggregate(self, instance: models.Model):
-        # Computes full aggregate excluding passed instance
+    def _get_full_aggregate(self, instance: models.Model) -> Optional[Subquery]:
+        """ Get aggregate subquery for full recompute of min/max aggregates."""
         foreign_object = self.get_foreign_object(instance)
         if foreign_object is None:
             return None
-        foreign_object_join = type(instance).objects.filter(
+        object_queryset = type(instance).objects.filter(
             Q((self.foreign_key, OuterRef('pk')))).values(self.foreign_key)
-        return Subquery(foreign_object_join.annotate(self.aggregate).values(
+        return Subquery(object_queryset.annotate(self.aggregate).values(
             self.aggregate.default_alias), output_field=models.IntegerField)
