@@ -1,13 +1,14 @@
 """ Tracking changes for denormalized fields."""
-
-from typing import Optional, Iterable, Tuple, Union
+from copy import copy
+from typing import Optional, Iterable, Tuple
 
 from django.db import models
 from django.db.models import Count, Q, Sum, Min, F
-from django.db.models.expressions import CombinedExpression
+from django.db.models.expressions import CombinedExpression, Expression, \
+    OuterRef, ExpressionWrapper, Subquery
+from django.db.models.functions import Coalesce, Least
 
 from denormalized.types import IncrementalUpdates
-
 
 PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
 
@@ -17,11 +18,14 @@ ENTERING, CHANGING, LEAVING = 1, 0, -1
 
 
 class DenormalizedTracker:
-    def __init__(self, field, aggregate=Count('*'), query=Q(),
-                 callback=lambda obj: True, related_name=None):
+    """
+    Tracks changes for some field and updates denormalized aggregate for that
+    field in foreign object.
+    """
+    def __init__(self, field, aggregate=Count('*'), callback=lambda obj: True,
+                 related_name=None):
         self.field = field
         self.aggregate = aggregate
-        self.query = query
         self.callback = callback
         self.foreign_key = related_name
 
@@ -87,7 +91,7 @@ class DenormalizedTracker:
 
     def _update_value(self,
                       foreign_object: models.Model,
-                      delta: Optional[CombinedExpression],
+                      delta: Optional[Expression],
                       ) -> Optional[Tuple[models.Model, IncrementalUpdates]]:
         if not foreign_object or delta is None:
             return None
@@ -97,7 +101,7 @@ class DenormalizedTracker:
                    instance: models.Model,
                    mode: int,
                    previous: Optional[models.Model] = None,
-                   ) -> Optional[CombinedExpression]:
+                   ) -> Optional[Expression]:
         """
         Get update expression for foreign object.
 
@@ -125,8 +129,21 @@ class DenormalizedTracker:
             # mode is ENTERING or LEAVING, only new_value matters.
             return F(self.field) + new_value * mode
         elif isinstance(self.aggregate, Min):
-            pass
-
+            new_value = self.get_value_from_instance(instance)
+            if mode == LEAVING:
+                # new denormalized value is somewhere in DB, computing full
+                # aggregate
+                return self.get_full_aggregate(instance)
+            if mode == ENTERING:
+                return Coalesce(Least(F(self.field), new_value), new_value)
+            if mode == CHANGING:
+                old_value = self.get_value_from_instance(previous)
+                if old_value > new_value:
+                    # value decreases, so denormalized value also may decrease
+                    return Coalesce(Least(F(self.field), new_value), new_value)
+            # (mode == CHANGING and value increases)
+            # in this situation we can't make anything except full recompute
+            return self.get_full_aggregate(instance)
         raise NotImplementedError()  # pragma: no cover
 
     def get_value_from_instance(self, instance):
@@ -137,6 +154,12 @@ class DenormalizedTracker:
             value = getattr(instance, arg.name)
         return value
 
-    def _get_full_aggregate(self, instance):
+    def get_full_aggregate(self, instance: models.Model):
         # Computes full aggregate excluding passed instance
-        raise NotImplementedError()
+        foreign_object = self.get_foreign_object(instance)
+        if foreign_object is None:
+            return None
+        foreign_object_join = type(instance).objects.filter(
+            Q((self.foreign_key, OuterRef('pk')))).values(self.foreign_key)
+        return Subquery(foreign_object_join.annotate(self.aggregate).values(
+            self.aggregate.default_alias), output_field=models.IntegerField)

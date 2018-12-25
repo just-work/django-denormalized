@@ -281,12 +281,22 @@ class CountTestCase(TestCase):
 
         self.assertMinValue()
 
-    def test_track_min_value_changed_on_change(self):
+    def test_track_min_value_changed_on_increase(self):
         """
         If object with min value changed this value, aggregate is updated
         """
 
         self.member.points = 10
+        self.member.save()
+
+        self.assertMinValue()
+
+    def test_track_min_value_changed_on_decrease(self):
+        """
+        If object with min value changed this value, aggregate is updated
+        """
+
+        self.member.points = -10
         self.member.save()
 
         self.assertMinValue()
