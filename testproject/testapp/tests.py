@@ -1,43 +1,87 @@
-from typing import Union
-
-from django.db.models import Sum, F, Min
+from django.db.models import F, Sum, Min, QuerySet, Aggregate, Q, Count, Max
 from django.test import TestCase
 
 from testproject.testapp import models
 
 
-class CountTestCase(TestCase):
+class DenormalizedTrackerTestCaseBase(TestCase):
+    """ Base class for tests."""
+    field_name: str
+    value_for_empty_set = 0
+    aggregate: Aggregate
+
     def setUp(self):
         self.group = models.Group.objects.create()
-        self.member = models.Member.objects.create(group=self.group)
+        self.team = models.Team.objects.create()
+        self.member = models.Member.objects.create(
+            group=self.group, team=self.team)
 
-    def assertMembersCount(self, group: models.Group = None):
+    def assertDenormalized(self, group: models.Group = None):
+        """ """
         group = group or self.group
         group.refresh_from_db()
-        expected = group.member_set.filter(active=True).count()
-        self.assertEqual(group.members_count, expected)
 
-    def assertPointsSum(self, obj: Union[models.Group, models.Team] = None):
-        obj = obj or self.group
+        expected = self.get_denormalized_value(group.member_set.all())
+        value = getattr(group, self.field_name)
+        self.assertEqual(value, expected)
+
+    def get_denormalized_value(self, queryset: QuerySet):
+        aggregate = queryset.aggregate(aggregate=self.aggregate)
+        value = aggregate['aggregate']
+        if value is None:
+            return self.value_for_empty_set
+        return value
+
+
+class TrackerTestCase(DenormalizedTrackerTestCaseBase):
+    """ Common tests for denormalized tracker."""
+
+    def get_denormalized_value(self, group: models.Group):
+        raise NotImplementedError()
+
+    def test_collector_delete(self):
+        """ Cascade delete works correctly."""
+        models.Member.objects.create(active=False, group=self.group)
+
+        self.group.delete()
+
+        self.assertEqual(models.Group.objects.count(), 0)
+
+    def assertPointsSum(self, obj):
         obj.refresh_from_db()
-        expected = obj.member_set.aggregate(s=Sum('points'))['s'] or 0
-        self.assertEqual(obj.points_sum, expected)
+        value = obj.member_set.filter(active=True).aggregate(
+            Sum('points'))['points__sum']
+        self.assertEqual(obj.points_sum, value)
 
-    def assertMinValue(self, group: models.Group = None):
-        group = group or self.group
-        group.refresh_from_db()
-        expected = group.member_set.aggregate(m=Min('points'))['m']
-        self.assertEqual(group.points_min, expected)
+    def test_track_multiple_foreign_keys(self):
+        """ Multiple foreign keys tracked correctly."""
+        team = models.Team.objects.create()
+        self.member.team = team
+        self.member.save()
+
+        self.assertPointsSum(team)
+        self.assertPointsSum(self.group)
+
+        self.member.points += 1
+        self.member.save()
+
+        self.assertPointsSum(team)
+        self.assertPointsSum(self.group)
+
+
+class CountTestCase(DenormalizedTrackerTestCaseBase):
+    field_name = 'members_count'
+    aggregate = Count('id', filter=Q(active=True))
 
     def test_initial_value(self):
         """ After setUp group has single member."""
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_increment_on_new(self):
         """ Creating new member increments counter."""
         models.Member.objects.create(group=self.group)
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_skip_increment_on_new(self):
         """ Creating new non-suitable member leaves counter same."""
@@ -53,7 +97,7 @@ class CountTestCase(TestCase):
         """ Deleting member decrements counter."""
         self.member.delete()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_skip_decrement_on_delete(self):
         """ Deleting member decrements counter."""
@@ -70,7 +114,7 @@ class CountTestCase(TestCase):
 
         self.member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_decrement_on_change(self):
         """ Changing foreign key decrements counter for old value."""
@@ -79,7 +123,7 @@ class CountTestCase(TestCase):
 
         self.member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_increment_on_set_group(self):
         """ If object without group is moved to group, increment."""
@@ -120,38 +164,22 @@ class CountTestCase(TestCase):
 
     def test_denormalize(self):
         """ Count can be refreshed from db."""
-        self.group.members_count = None
+        setattr(self.group, self.field_name, 1000000)
+        self.group.save()
 
         self.group.member_set.denormalize()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_denormalize_with_conditions(self):
         """ Count can be refreshed from db."""
         models.Member.objects.create(group=self.group, active=False)
-        self.group.members_count = None
+        setattr(self.group, self.field_name, 1000000)
+        self.group.save()
 
         self.group.member_set.denormalize()
 
-        self.assertMembersCount()
-
-    def test_increment_sum_aggregate(self):
-        """ Sum is incremented properly."""
-        self.member.points = 10
-
-        self.member.save()
-
-        self.assertPointsSum()
-
-    def test_decrement_sum_aggregate(self):
-        """ Sum is decremented properly."""
-        models.Member.objects.all().update(points=10)
-        models.Group.objects.all().update(points_sum=10)
-        self.member.refresh_from_db()
-
-        self.member.delete()
-
-        self.assertPointsSum()
+        self.assertDenormalized()
 
     def test_decrement_on_became_not_suitable(self):
         """ If object is not suitable anymore, decrement."""
@@ -159,18 +187,18 @@ class CountTestCase(TestCase):
 
         self.member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_increment_on_become_suitable(self):
         """ If object became suitable, increment."""
         member = models.Member.objects.create(active=False, group=self.group)
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
         member.active = True
         member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_no_dirty_increments(self):
         """
@@ -181,7 +209,7 @@ class CountTestCase(TestCase):
 
         models.Member.objects.create(group=self.group)
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_previous_state_reset_on_save(self):
         """ Save resets saved previous state for tracked object."""
@@ -190,25 +218,25 @@ class CountTestCase(TestCase):
         member.active = True
         member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
         member.active = False
         member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_handle_nullable_foreign_key(self):
         """ Nullable foreign key is skipped for trackers."""
         models.Member.objects.create(group=None)
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_foreign_key_become_null(self):
         """ If foreign key became null, decrement."""
         self.member.group = None
         self.member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_foreign_key_become_not_null(self):
         """ If foreign key became not null, increment."""
@@ -217,15 +245,7 @@ class CountTestCase(TestCase):
         member.group = self.group
         member.save()
 
-        self.assertMembersCount()
-
-    def test_collector_delete(self):
-        """ Cascade delete works correctly."""
-        models.Member.objects.create(active=False, group=self.group)
-
-        self.group.delete()
-
-        self.assertEqual(models.Group.objects.count(), 0)
+        self.assertDenormalized()
 
     def test_save_not_affects_counters(self):
         """
@@ -233,7 +253,12 @@ class CountTestCase(TestCase):
         """
         self.member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
+
+
+class SumTestCase(CountTestCase):
+    field_name = 'points_sum'
+    aggregate = Sum('points', filter=Q(active=True))
 
     def test_save_incremental(self):
         """
@@ -247,56 +272,35 @@ class CountTestCase(TestCase):
         self.group.refresh_from_db()
         self.assertEqual(self.group.points_sum, points + 1)
 
-    def test_track_multiple_foreign_keys(self):
-        """ Multiple foreign keys tracked correctly."""
-        team = models.Team.objects.create()
-        self.member.team = team
-        self.member.save()
 
-        self.assertPointsSum(team)
-        self.assertPointsSum(self.group)
+class MinTestCase(SumTestCase):
+    field_name = 'points_min'
+    aggregate = Min('points', filter=Q(active=True))
+    value_for_empty_set = None
 
-        self.member.points += 1
-        self.member.save()
-
-        self.assertPointsSum(team)
-        self.assertPointsSum(self.group)
-
-    def test_track_min_value_on_add_first(self):
+    def test_track_value_changed_on_increase(self):
         """
-        Tracking min value is correct when adding first object to group.
+        Separate case for increasing tracked value.
         """
-        group = models.Group.objects.create()
-
-        models.Member.objects.create(group=group, points=5)
-
-        self.assertMinValue(group)
-
-    def test_track_min_value_preserved_on_new_member(self):
-        """
-        Min value is same after adding new object with greater value.
-        """
-
-        models.Member.objects.create(group=self.group, points=5)
-
-        self.assertMinValue()
-
-    def test_track_min_value_changed_on_increase(self):
-        """
-        If object with min value changed this value, aggregate is updated
-        """
-
         self.member.points = 10
         self.member.save()
 
-        self.assertMinValue()
+        self.assertDenormalized()
 
     def test_track_min_value_changed_on_decrease(self):
         """
-        If object with min value changed this value, aggregate is updated
+        Separate case for decreasing tracked value.
         """
-
         self.member.points = -10
         self.member.save()
 
-        self.assertMinValue()
+        self.assertDenormalized()
+
+
+class MaxTestCase(MinTestCase):
+    field_name = 'points_max'
+    aggregate = Max('points', filter=Q(active=True))
+
+    def test_decrement_on_became_not_suitable(self):
+        super().test_decrement_on_became_not_suitable()
+

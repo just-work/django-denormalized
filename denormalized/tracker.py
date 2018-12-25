@@ -22,11 +22,16 @@ class DenormalizedTracker:
     field in foreign object.
     """
     def __init__(self, field, aggregate=Count('*'), callback=lambda obj: True,
-                 related_name=None):
+                 query=Q(), related_name=None, alias=None):
         self.field = field
         self.aggregate = aggregate
         self.callback = callback
         self.foreign_key = related_name
+        self.query = query
+        try:
+            self.alias = alias or self.aggregate.default_alias
+        except TypeError:
+            self.alias = f'{field}_tracker'
 
     def __repr__(self):
         return f'{self.field} = {self.aggregate}'
@@ -145,7 +150,7 @@ class DenormalizedTracker:
         if mode == LEAVING:
             # new denormalized value is somewhere in DB, computing full
             # aggregate
-            return self._get_full_aggregate(instance)
+            return self._get_full_aggregate(instance, exclude=True)
         if mode == ENTERING:
             return Coalesce(Least(F(self.field), new_value), new_value)
         if mode == CHANGING:
@@ -163,14 +168,14 @@ class DenormalizedTracker:
         if mode == LEAVING:
             # new denormalized value is somewhere in DB, computing full
             # aggregate
-            return self._get_full_aggregate(instance)
+            return self._get_full_aggregate(instance, exclude=True)
         if mode == ENTERING:
             return Coalesce(Greatest(F(self.field), new_value), new_value)
         if mode == CHANGING:
             old_value = self._get_value_from_instance(previous)
             if old_value < new_value:
                 # value increases, so denormalized value also may increase
-                return Coalesce(Least(F(self.field), new_value), new_value)
+                return Coalesce(Greatest(F(self.field), new_value), new_value)
         # (mode == CHANGING and value decreases)
         # in this situation we can't make anything except full recompute
         return self._get_full_aggregate(instance)
@@ -184,12 +189,16 @@ class DenormalizedTracker:
             value = getattr(instance, arg.name)
         return value
 
-    def _get_full_aggregate(self, instance: models.Model) -> Optional[Subquery]:
+    def _get_full_aggregate(self, instance: models.Model,
+                            exclude: bool = False) -> Optional[Subquery]:
         """ Get aggregate subquery for full recompute of min/max aggregates."""
         foreign_object = self.get_foreign_object(instance)
         if foreign_object is None:
             return None
         object_queryset = type(instance).objects.filter(
             Q((self.foreign_key, OuterRef('pk')))).values(self.foreign_key)
-        return Subquery(object_queryset.annotate(self.aggregate).values(
-            self.aggregate.default_alias), output_field=models.IntegerField)
+        if exclude:
+            object_queryset = object_queryset.exclude(pk=instance.pk)
+        return Subquery(object_queryset.annotate(
+            **{self.alias: self.aggregate}).values(
+            self.alias), output_field=models.IntegerField)
