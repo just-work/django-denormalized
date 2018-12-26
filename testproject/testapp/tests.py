@@ -300,7 +300,3 @@ class MinTestCase(SumTestCase):
 class MaxTestCase(MinTestCase):
     field_name = 'points_max'
     aggregate = Max('points', filter=Q(active=True))
-
-    def test_decrement_on_became_not_suitable(self):
-        super().test_decrement_on_became_not_suitable()
-
