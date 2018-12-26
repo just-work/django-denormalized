@@ -11,7 +11,18 @@ from denormalized.types import IncrementalUpdates
 PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
 
 
-# what's going on with group member
+# Constants denoting what's going on with member of denormalized object set.
+#
+# I.E. considering Group and Member models (Member have FK to Group), each
+# group has number of suitable members to count, in other words, denormalized
+# object set.
+# * When a member becomes suitable or a suitable member changes group
+# FK value, it is ENTERING counted object set for it's new group.
+# * When a member becomes non-suitable, or a suitable member changes group FK
+# value, it is LEAVING counted object set for it's old group.
+# * When group FK value is not changing and member remains suitable, the only
+# meaningful change is aggregated value change (for sum/min/max). So, member
+# trached value is CHANGING.
 ENTERING, CHANGING, LEAVING = 1, 0, -1
 
 
@@ -20,13 +31,13 @@ class DenormalizedTracker:
     Tracks changes for some field and updates denormalized aggregate for that
     field in foreign object.
     """
-    def __init__(self, field, aggregate=Count('*'), callback=lambda obj: True,
-                 query=Q(), related_name=None):
+    def __init__(self, field, aggregate=Count('*'), query=Q(),
+                 callback=lambda obj: True, related_name=None):
         self.field = field
         self.aggregate = aggregate
+        self.query = query
         self.callback = callback
         self.foreign_key = related_name
-        self.query = query
         self.alias = self.aggregate.default_alias
 
     def __repr__(self):  # pragma: no cover
@@ -71,12 +82,14 @@ class DenormalizedTracker:
             changed.append(self._update_value(foreign_object, delta))
         elif foreign_object != old_foreign_object:
             if old_suitable:
-                # object is removed from old_foreign_object denormalized object set
+                # object is removed from old_foreign_object
+                # denormalized object set
                 old_delta = self._get_delta(old_instance, mode=LEAVING)
-                changed.append(self._update_value(old_foreign_object, old_delta))
+                changed.append(
+                    self._update_value(old_foreign_object, old_delta))
             if is_suitable:
-                # at the same time object is added to foreign_object denormalized
-                # object set
+                # at the same time object is added to foreign_object
+                # denormalized object set
                 delta = self._get_delta(instance, mode=ENTERING)
                 changed.append(self._update_value(foreign_object, delta))
         else:
