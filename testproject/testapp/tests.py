@@ -36,9 +36,6 @@ class DenormalizedTrackerTestCaseBase(TestCase):
 class TrackerTestCase(DenormalizedTrackerTestCaseBase):
     """ Common tests for denormalized tracker."""
 
-    def get_denormalized_value(self, group: models.Group):
-        raise NotImplementedError()
-
     def test_collector_delete(self):
         """ Cascade delete works correctly."""
         models.Member.objects.create(active=False, group=self.group)
