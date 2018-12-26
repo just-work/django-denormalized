@@ -26,8 +26,8 @@ class Member(models.Model):
                 "members_count",                    
                 # callback to determine whether object should be counted or not
                 callback=lambda obj: obj.active,
-                # Aggregate is constrained to count only suitable objects
-                aggregate=models.Count('id', filter=models.Q(active=True))),
+                # QuerySet filter to count only suitable objects
+                query=models.Q(active=True)),
             DenormalizedTracker(
                 # multiple denormalized fields tracked for single foreign key
                 "points_sum",
