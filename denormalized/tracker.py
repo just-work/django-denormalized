@@ -1,12 +1,12 @@
 """ Tracking changes for denormalized fields."""
-from typing import Optional, Iterable, Tuple
+from typing import Optional, Iterable, Any
 
 from django.db import models
 from django.db.models import Count, Q, F
 from django.db.models import expressions
 from django.db.models.functions import Coalesce, Least, Greatest
 
-from denormalized.types import IncrementalUpdates
+from denormalized.types import UpdateUnit
 
 PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
 
@@ -44,7 +44,7 @@ class DenormalizedTracker:
         return f'{self.field} = {self.aggregate}'
 
     def track_changes(self, instance=None, created=None, deleted=None
-                      ) -> Iterable[Tuple[models.Model, IncrementalUpdates]]:
+                      ) -> Iterable[UpdateUnit]:
         foreign_object = self._get_foreign_object(instance)
         is_suitable = self.callback(instance)
         if created:
@@ -105,7 +105,7 @@ class DenormalizedTracker:
     def _update_value(self,
                       foreign_object: models.Model,
                       delta: Optional[expressions.Expression],
-                      ) -> Optional[Tuple[models.Model, IncrementalUpdates]]:
+                      ) -> Optional[UpdateUnit]:
         if not foreign_object or delta is None:
             return None
         return foreign_object, {self.field: delta}
@@ -189,7 +189,7 @@ class DenormalizedTracker:
         # in this situation we can't make anything except full recompute
         return self._get_full_aggregate(instance)
 
-    def _get_value_from_instance(self, instance):
+    def _get_value_from_instance(self, instance: models.Model) -> Any:
         """ Get tracked value from instance."""
         arg = self.aggregate.source_expressions[0]
         value = getattr(instance, arg.name)
