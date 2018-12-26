@@ -43,18 +43,9 @@ class DenormalizedTracker:
     def __repr__(self):  # pragma: no cover
         return f'{self.field} = {self.aggregate}'
 
-    def get_foreign_object(self, instance: models.Model
-                           ) -> Optional[models.Model]:
-        """ Safely returns foreign object from instance."""
-        try:
-            return getattr(instance, self.foreign_key)
-        except models.ObjectDoesNotExist:
-            # this may raise DNE while cascade deleting with Collector
-            return None
-
     def track_changes(self, instance=None, created=None, deleted=None
                       ) -> Iterable[Tuple[models.Model, IncrementalUpdates]]:
-        foreign_object = self.get_foreign_object(instance)
+        foreign_object = self._get_foreign_object(instance)
         is_suitable = self.callback(instance)
         if created:
             if not is_suitable:
@@ -71,7 +62,7 @@ class DenormalizedTracker:
 
         old_instance = getattr(instance, PREVIOUS_VERSION_FIELD)
         old_suitable = self.callback(old_instance)
-        old_foreign_object = self.get_foreign_object(old_instance)
+        old_foreign_object = self._get_foreign_object(old_instance)
 
         changed = []
         sign = is_suitable - old_suitable
@@ -101,6 +92,15 @@ class DenormalizedTracker:
             changed.append(self._update_value(foreign_object, delta))
 
         return filter(None, changed)
+
+    def _get_foreign_object(self, instance: models.Model
+                            ) -> Optional[models.Model]:
+        """ Safely returns foreign object from instance."""
+        try:
+            return getattr(instance, self.foreign_key)
+        except models.ObjectDoesNotExist:
+            # this may raise DNE while cascade deleting with Collector
+            return None
 
     def _update_value(self,
                       foreign_object: models.Model,
@@ -203,7 +203,7 @@ class DenormalizedTracker:
                             exclude: bool = False
                             ) -> Optional[expressions.Subquery]:
         """ Get aggregate subquery for full recompute of min/max aggregates."""
-        foreign_object = self.get_foreign_object(instance)
+        foreign_object = self._get_foreign_object(instance)
         if foreign_object is None:
             return None
         object_queryset = type(instance).objects.filter(
