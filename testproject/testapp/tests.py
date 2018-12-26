@@ -91,7 +91,7 @@ class CountTestCase(DenormalizedTrackerTestCaseBase):
 
         member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_decrement_on_delete(self):
         """ Deleting member decrements counter."""
@@ -105,7 +105,7 @@ class CountTestCase(DenormalizedTrackerTestCaseBase):
 
         member.delete()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_increment_on_change(self):
         """ Changing foreign key increments counter."""
@@ -132,7 +132,7 @@ class CountTestCase(DenormalizedTrackerTestCaseBase):
 
         member.save()
 
-        self.assertMembersCount()
+        self.assertDenormalized()
 
     def test_increment_and_change_group(self):
         """
@@ -146,8 +146,8 @@ class CountTestCase(DenormalizedTrackerTestCaseBase):
         self.member.group = group
         self.member.save()
 
-        self.assertMembersCount()
-        self.assertMembersCount(group)
+        self.assertDenormalized()
+        self.assertDenormalized(group)
 
     def test_decrement_and_change_group(self):
         """
@@ -159,8 +159,8 @@ class CountTestCase(DenormalizedTrackerTestCaseBase):
         self.member.group = group
         self.member.save()
 
-        self.assertMembersCount()
-        self.assertMembersCount(group)
+        self.assertDenormalized()
+        self.assertDenormalized(group)
 
     def test_denormalize(self):
         """ Count can be refreshed from db."""
