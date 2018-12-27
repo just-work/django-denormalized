@@ -22,7 +22,7 @@ PREVIOUS_VERSION_FIELD = '_denormalized_previous_version'
 # value, it is LEAVING counted object set for it's old group.
 # * When group FK value is not changing and member remains suitable, the only
 # meaningful change is aggregated value change (for sum/min/max). So, member
-# trached value is CHANGING.
+# tracked value is CHANGING.
 ENTERING, CHANGING, LEAVING = 1, 0, -1
 
 
