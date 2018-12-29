@@ -17,6 +17,7 @@ class Group(models.Model):
 
 class Team(models.Model):
     points_sum = models.PositiveIntegerField(default=0)
+    members_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         app_label = 'testapp'
@@ -51,7 +52,8 @@ class Member(models.Model):
         trackers=[
             DenormalizedTracker(
                 "points_sum",
-                aggregate=Sum("points"))
+                aggregate=Sum("points")),
+            DenormalizedTracker("members_count"),
         ])
     active = models.BooleanField(default=True)
     points = models.IntegerField(default=0)
