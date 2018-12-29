@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import Sum, Q
+from django.db.models import Sum, Min, Count, Q, Max
 
 from denormalized.models import DenormalizedForeignKey
 from denormalized.tracker import DenormalizedTracker
@@ -8,6 +8,8 @@ from denormalized.tracker import DenormalizedTracker
 class Group(models.Model):
     members_count = models.PositiveIntegerField(default=0)
     points_sum = models.PositiveIntegerField(default=0)
+    points_min = models.PositiveIntegerField(null=True)
+    points_max = models.PositiveIntegerField(null=True)
 
     class Meta:
         app_label = 'testapp'
@@ -15,6 +17,7 @@ class Group(models.Model):
 
 class Team(models.Model):
     points_sum = models.PositiveIntegerField(default=0)
+    members_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         app_label = 'testapp'
@@ -23,14 +26,35 @@ class Team(models.Model):
 class Member(models.Model):
     group = DenormalizedForeignKey(
         Group, models.CASCADE, null=True,
-        trackers=[DenormalizedTracker("members_count",
-                                      callback=lambda obj: obj.active,
-                                      query=Q(active=True)),
-                  DenormalizedTracker("points_sum", aggregate=Sum("points"))])
+        trackers=[
+            DenormalizedTracker(
+                "members_count",
+                callback=lambda obj: obj.active,
+                query=Q(active=True),
+                aggregate=Count("pk")),
+            DenormalizedTracker(
+                "points_sum",
+                callback=lambda obj: obj.active,
+                aggregate=Sum("points")),
+            DenormalizedTracker(
+                "points_min",
+                callback=lambda obj: obj.active,
+                query=Q(active=True),
+                aggregate=Min("points")),
+            DenormalizedTracker(
+                "points_max",
+                callback=lambda obj: obj.active,
+                query=Q(active=True),
+                aggregate=Max("points"))
+        ])
     team = DenormalizedForeignKey(
         Team, models.CASCADE, null=True,
-        trackers=[DenormalizedTracker("points_sum", aggregate=Sum("points"))]
-    )
+        trackers=[
+            DenormalizedTracker(
+                "points_sum",
+                aggregate=Sum("points")),
+            DenormalizedTracker("members_count"),
+        ])
     active = models.BooleanField(default=True)
     points = models.IntegerField(default=0)
 

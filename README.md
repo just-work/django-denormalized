@@ -31,7 +31,7 @@ class Member(models.Model):
             DenormalizedTracker(
                 # multiple denormalized fields tracked for single foreign key
                 "points_sum",
-                # Sum is also supported
+                # Sum/Min/Max is also supported
                 aggregate=models.Sum("points"))
         ])
     active = models.BooleanField(default=True)
