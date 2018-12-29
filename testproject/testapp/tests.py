@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.db.models import F, Sum, Min, QuerySet, Aggregate, Q, Count, Max
 from django.test import TestCase
 
@@ -64,6 +66,21 @@ class TrackerTestCase(DenormalizedTrackerTestCaseBase):
 
         self.assertPointsSum(team)
         self.assertPointsSum(self.group)
+
+    def test_not_tracking_non_suitable(self):
+        """ Changes for non-suitable object are not computed."""
+        self.member.active = False
+        self.member.save()
+
+        p = mock.patch.object(
+            models.Member._meta.get_field('group').trackers[0],
+            '_get_delta',
+            return_value=0)
+        with p as delta_mock:
+            self.member.points += 1
+            self.member.save()
+
+        delta_mock.assert_not_called()
 
 
 class CountTestCase(DenormalizedTrackerTestCaseBase):

@@ -31,7 +31,7 @@ class DenormalizedTracker:
     Tracks changes for some field and updates denormalized aggregate for that
     field in foreign object.
     """
-    def __init__(self, field, aggregate=Count('*'), query=Q(),
+    def __init__(self, field, aggregate=Count('pk'), query=Q(),
                  callback=lambda obj: True, related_name=None):
         self.field = field
         self.aggregate = aggregate
@@ -83,7 +83,7 @@ class DenormalizedTracker:
                 # denormalized object set
                 delta = self._get_delta(instance, mode=ENTERING)
                 changed.append(self._update_value(foreign_object, delta))
-        else:
+        elif is_suitable:
             # object preserves suitability and foreign object reference, only
             # tracked value itself may change
             # (foreign_object == old_foreign_object and sign == 0)
@@ -211,6 +211,7 @@ class DenormalizedTracker:
             self.foreign_key)
         if exclude:
             object_queryset = object_queryset.exclude(pk=instance.pk)
-        return expressions.Subquery(object_queryset.annotate(
-            **{self.alias: self.aggregate}).values(
-            self.alias), output_field=models.IntegerField)
+        return expressions.Subquery(
+            object_queryset.annotate(
+                **{self.alias: self.aggregate}).values(self.alias)[:1],
+            output_field=models.IntegerField)
