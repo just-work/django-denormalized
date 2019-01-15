@@ -301,13 +301,25 @@ class MinTestCase(SumTestCase):
 
         self.assertDenormalized()
 
-    def test_track_min_value_changed_on_decrease(self):
+    def test_track_value_changed_on_decrease(self):
         """
         Separate case for decreasing tracked value.
         """
         self.member.points = -10
         self.member.save()
 
+        self.assertDenormalized()
+
+    def test_leaving_skips_not_counted(self):
+        """
+        Denormalized values is updated properly while creating multiple objects
+        """
+        models.Member.objects.create(
+            group=self.group, points=self.member.points + 1,
+            active=False)
+
+        self.member.active = False
+        self.member.save()
         self.assertDenormalized()
 
 
