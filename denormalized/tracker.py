@@ -206,9 +206,9 @@ class DenormalizedTracker:
         foreign_object = self._get_foreign_object(instance)
         if foreign_object is None:
             return None
+        filter_q = Q((self.foreign_key, expressions.OuterRef('pk')))
         object_queryset = type(instance).objects.filter(
-            Q((self.foreign_key, expressions.OuterRef('pk')))).values(
-            self.foreign_key)
+            filter_q & self.query).values(self.foreign_key)
         if exclude:
             object_queryset = object_queryset.exclude(pk=instance.pk)
         return expressions.Subquery(
