@@ -194,8 +194,8 @@ class DenormalizedTracker:
         arg = self.aggregate.source_expressions[0]
         value = getattr(instance, arg.name)
         if isinstance(value, expressions.Expression):
-            instance.refresh_from_db(fields=(arg.name,))
-            value = getattr(instance, arg.name)
+            value = type(instance).objects.filter(pk=instance.pk).values_list(
+                arg.name, flat=True).get()
         return value
 
     def _get_full_aggregate(self,
