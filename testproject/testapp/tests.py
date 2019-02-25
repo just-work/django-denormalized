@@ -88,8 +88,8 @@ class TrackerTestCase(DenormalizedTrackerTestCaseBase):
 
         delta_mock.assert_not_called()
 
-    def test_refresh_from_db(self):
-        """ after refresh_from_db initial version is updated."""
+    def test_refresh_from_db_fields(self):
+        """ after refresh_from_db initial field value is updated."""
         models.Member.objects.filter(pk=self.member.pk).update(active=False)
         self.member.refresh_from_db(fields=('group',))
 
@@ -104,6 +104,16 @@ class TrackerTestCase(DenormalizedTrackerTestCaseBase):
         self.member.refresh_from_db(fields=('active',))
 
         self.assertInitialState(active=False)
+
+    def test_refresh_from_db(self):
+        """ after refresh_from_db all initial field values updated."""
+        models.Member.objects.filter(pk=self.member.pk).update(active=False)
+        self.assertInitialState(active=True)
+
+        self.member.refresh_from_db()
+
+        self.assertInitialState(active=False)
+
 
 
 class CountTestCase(DenormalizedTrackerTestCaseBase):
