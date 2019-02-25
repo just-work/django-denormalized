@@ -3,6 +3,7 @@ from unittest import mock
 from django.db.models import F, Sum, Min, QuerySet, Aggregate, Q, Count, Max
 from django.test import TestCase
 
+from denormalized import tracker
 from testproject.testapp import models
 
 
@@ -52,6 +53,11 @@ class TrackerTestCase(DenormalizedTrackerTestCaseBase):
             Sum('points'))['points__sum']
         self.assertEqual(obj.points_sum, value)
 
+    def assertInitialState(self, **fields):
+        initial = getattr(self.member, tracker.PREVIOUS_VERSION_FIELD)
+        for k, v in fields.items():
+            self.assertEqual(getattr(initial, k), v)
+
     def test_track_multiple_foreign_keys(self):
         """ Multiple foreign keys tracked correctly."""
         team = models.Team.objects.create()
@@ -81,6 +87,23 @@ class TrackerTestCase(DenormalizedTrackerTestCaseBase):
             self.member.save()
 
         delta_mock.assert_not_called()
+
+    def test_refresh_from_db(self):
+        """ after refresh_from_db initial version is updated."""
+        models.Member.objects.filter(pk=self.member.pk).update(active=False)
+        self.member.refresh_from_db(fields=('group',))
+
+        # refreshing unrelated fields does not affect initial values
+        self.assertInitialState(active=True)
+
+        # initial value remains same after in-memory change
+        self.member.active = False
+        self.assertInitialState(active=True)
+
+        # initial value is updated after refreshing field from db
+        self.member.refresh_from_db(fields=('active',))
+
+        self.assertInitialState(active=False)
 
 
 class CountTestCase(DenormalizedTrackerTestCaseBase):
