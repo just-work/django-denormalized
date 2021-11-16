@@ -1,8 +1,8 @@
 # django-denormalized
 Utils for maintaining denormalized aggregates for Django models.
 
-[![Build Status](https://travis-ci.org/just-work/django-denormalized.svg?branch=master)](https://travis-ci.org/just-work/django-denormalized)
-[![codecov](https://codecov.io/gh/just-work/django-denormalized/branch/master/graph/badge.svg)](https://codecov.io/gh/just-work/django-denormalized)
+[![Build Status](https://github.com/just-work/django-denormalized/actions/workflows/build.yml/badge.svg)](https://github.com/just-work/django-denormalized/actions/workflows/build.yml)
+[![codecov](https://github.com/just-work/django-denormalized/actions/workflows/codecov.yml/badge.svg)](https://github.com/just-work/django-denormalized/actions/workflows/codecov.yml)
 [![PyPI version](https://badge.fury.io/py/django-denormalized.svg)](https://badge.fury.io/py/django-denormalized)
 
 # Example
