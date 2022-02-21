@@ -17,7 +17,7 @@ class DenormalizedTrackerTestCaseBase(TestCase):
         self.group = models.Group.objects.create()
         self.team = models.Team.objects.create()
         self.member = models.Member.objects.create(
-            group=self.group, team=self.team)
+            group=self.group, team=self.team, points=100)
 
     def assertDenormalized(self, group: models.Group = None):
         """ """
@@ -113,7 +113,6 @@ class TrackerTestCase(DenormalizedTrackerTestCaseBase):
         self.member.refresh_from_db()
 
         self.assertInitialState(active=False)
-
 
 
 class CountTestCase(DenormalizedTrackerTestCaseBase):
@@ -329,7 +328,7 @@ class MinTestCase(SumTestCase):
         """
         Separate case for increasing tracked value.
         """
-        self.member.points = 10
+        self.member.points += 10
         self.member.save()
 
         self.assertDenormalized()
@@ -338,7 +337,7 @@ class MinTestCase(SumTestCase):
         """
         Separate case for decreasing tracked value.
         """
-        self.member.points = -10
+        self.member.points -= 10
         self.member.save()
 
         self.assertDenormalized()
