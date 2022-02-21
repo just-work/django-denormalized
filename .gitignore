@@ -1,0 +1,4 @@
+.idea
+build
+django_denormalized.egg-info
+__pycache__
