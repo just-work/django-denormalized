@@ -1,4 +1,6 @@
 .idea
 build
+dist
 django_denormalized.egg-info
 __pycache__
+.tox

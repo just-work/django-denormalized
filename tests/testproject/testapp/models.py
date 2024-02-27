@@ -1,8 +1,8 @@
 from django.db import models
 from django.db.models import Sum, Min, Count, Q, Max
 
-from denormalized.models import DenormalizedForeignKey
-from denormalized.tracker import DenormalizedTracker
+from denormalized import DenormalizedForeignKey
+from denormalized import DenormalizedTracker
 
 
 class Group(models.Model):

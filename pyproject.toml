@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-git-versioning"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools-git-versioning]
+enabled = true
+
+[project]
+dynamic = ["version"]
+
+name = "django_denormalized"
+description = "Utils for maintaining denormalized aggregates for Django models"
+
+authors = [
+  { name="Sergey Tikhonov", email="zimbler@gmail.com" },
+]
+readme = "README.md"
+license = {text = "Beer License"}
+
+requires-python = ">=3.7"
+
+dependencies = [
+  "Django>=2.2,<5.1",
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/just-work/django-denormalized"
+Issues = "https://github.com/just-work/django-denormalized/issues"

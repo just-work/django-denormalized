@@ -1,6 +1,6 @@
 name: build
 
-on: [push, pull_request]
+on: [ push, pull_request ]
 
 jobs:
   build:
@@ -8,20 +8,24 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: [ "3.7", "3.8", "3.9", "3.10", "3.11", "3.12" ]
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip setuptools
-        pip install tox tox-gh-actions wheel
-        sed -i '/Django==.*/d' ./requirements.txt # delete django dependency
-    - name: Test with tox
-      run: |
-        tox
-        python setup.py sdist bdist_wheel install
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox tox-gh-actions build
+          sed -i '/Django==.*/d' ./requirements.txt # delete django dependency
+          sed -i '/Django==.*/d' ./pyproject.toml # delete django dependency
+
+      - name: Test with tox
+        run: |
+          tox  # run tests
+          python -m build  # check package build success
+          python -m pip install -q -e .  # check package installation success
+

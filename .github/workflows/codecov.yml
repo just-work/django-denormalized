@@ -12,9 +12,9 @@ jobs:
     - name: Generate coverage report
       run: |
         pip install -r requirements.txt
-        pip install coverage setuptools
+        pip install coverage
         pip install -q -e .
-        coverage run manage.py test testproject/
+        coverage run tests/manage.py test
         coverage xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v2
