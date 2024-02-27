@@ -20,7 +20,7 @@ license = {text = "Beer License"}
 requires-python = ">=3.7"
 
 dependencies = [
-#  "Django>=2.2,<5.1",
+  "Django>=2.2,<5.1",
 ]
 
 classifiers = [
