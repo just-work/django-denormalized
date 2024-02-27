@@ -21,6 +21,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install tox tox-gh-actions build
           sed -i '/Django==.*/d' ./requirements.txt # delete django dependency
+          sed -i '/Django==.*/d' ./pyproject.toml # delete django dependency
+
       - name: Test with tox
         run: |
           tox  # run tests

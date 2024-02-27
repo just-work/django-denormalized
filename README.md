@@ -9,7 +9,7 @@ Utils for maintaining denormalized aggregates for Django models.
 
 ```python
 from django.db import models
-from denormalized import DenormalizedTracker, DenormalizedForeignKey
+from src.denormalized import DenormalizedTracker, DenormalizedForeignKey
 
 
 class Group(models.Model):
@@ -23,7 +23,7 @@ class Member(models.Model):
         trackers=[
             DenormalizedTracker(
                 # name of field to store denormalized count of active members
-                "members_count",                    
+                "members_count",
                 # callback to determine whether object should be counted or not
                 callback=lambda obj: obj.active,
                 # QuerySet filter to count only suitable objects
